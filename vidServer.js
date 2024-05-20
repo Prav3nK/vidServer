@@ -26,9 +26,9 @@ const remoteOutputPath = '/home/fome/data/OUTPUT/';
 
 // Configure AWS SDK with provided credentials
 AWS.config.update({
-  accessKeyId: 'AKIA5ETPKN3SYROGMZOZ',
-  secretAccessKey: 'm1DhV5KSKhzhFrYna1TR5GXyqa2EnaORvgHxWXP+',
-  region: 'ap-southeast-2' // Specify the region of your bucket
+  accessKeyId: 'YOUR_AWS_ACCESS_KEY_ID',
+  secretAccessKey: 'YOUR_AWS_SECRET_ACCESS_KEY',
+  region: 'YOUR_AWS_REGION' // Specify the region of your bucket
 });
 
 const s3 = new AWS.S3();
@@ -138,6 +138,19 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 
+  // Upload the file to the remote server's INPUT directory using SFTP
+  const sftp = new SftpClient();
+  try {
+    await sftp.connect({ host: ip, port: portSSH, username: usernameSSH, password: passwordSSH });
+    await sftp.put(uploadedFile.buffer, remoteInputPath + uploadedFile.originalname);
+    console.log('File uploaded to remote INPUT directory');
+  } catch (error) {
+    console.error('SFTP upload error:', error);
+    return res.status(500).json({ error: 'Server error' });
+  } finally {
+    await sftp.end();
+  }
+
   // Execute SSH commands with the user-provided action
   const commands = `
     cd /home/fome/anaconda3/bin;
@@ -169,7 +182,6 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   const remoteOutputFilePath = remoteOutputPath + outputFileName;
   const processedS3Key = `${outputFolder}${outputFileName}`;
   try {
-    const sftp = new SftpClient();
     await sftp.connect({ host: ip, port: portSSH, username: usernameSSH, password: passwordSSH });
     const processedVideoBuffer = await sftp.get(remoteOutputFilePath);
     await sftp.end();
